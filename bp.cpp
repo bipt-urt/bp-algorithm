@@ -3,6 +3,7 @@
 #include <sstream>
 #include <vector>
 #include <deque>
+#include <utility>
 #include <string>
 #include <cstdlib>
 
@@ -15,16 +16,28 @@ class Image
 		Image(const string&);
 		Image(const size_t&);
 		Image(const size_t&, const size_t&);
+		Image(const pair<size_t, size_t>&);
+		Image(const pair<size_t, size_t>&, const size_t&);
+		Image(const Image&);
+		Image(const Image&, const bool&);
+		Image convolution(const Image&, const bool&) const;
+		const deque<deque<float>>& image() const;
+		pair<size_t, size_t> imageSize() const;
 	protected:
-		enum imageType{unknown, ascii, binary};
+		enum imageType
+		{
+			unknown,
+			ascii,
+			binary
+		};
 		bool openImage(const string&);
 		bool ppmReadLine(fstream&, string&);
 		unsigned char ppmReadPixel(fstream&);
 	private:
 		void init();
 		deque<deque<float>> img;
-		int height;
-		int width;
+		size_t height;
+		size_t width;
 		int colorDepth;
 };
 
@@ -48,16 +61,88 @@ Image::Image(const string& _filename)
 	}
 }
 
-Image::Image(const size_t& _length)
+Image::Image(const size_t& _length):
+	Image(_length, _length)
 {
-	init();
 	return;
 }
 
 Image::Image(const size_t& _width, const size_t& _height)
 {
 	init();
+	for (size_t imgHeight=0; imgHeight!=_height; imgHeight++)
+	{
+		deque<float> imgRow(_width, 0);
+		this->img.push_back(imgRow);
+	}
+	this->width = _width;
+	this->height = _height;
 	return;
+}
+
+Image::Image(const pair<size_t, size_t>& _imgSize):
+	Image(_imgSize, 0)
+{
+	return;
+}
+
+Image::Image(const pair<size_t, size_t>& _imgSize, const size_t& _padding):
+	Image(_imgSize.first + _padding, _imgSize.second + _padding)
+{
+	return;
+}
+
+Image::Image(const Image& _img):
+	Image(_img, false)
+{
+	return;
+}
+
+Image::Image(const Image& _img, const bool& _dontCopyContent)
+{
+	init();
+	for (size_t imgHeight=0; imgHeight!=_img.imageSize().second; imgHeight++)
+	{
+		if (_dontCopyContent)
+		{
+			deque<float> imgRow(_img.imageSize().first, 0);
+			this->img.push_back(imgRow);
+		}
+		else
+		{
+			deque<float> imgRow(_img.image()[imgHeight]);
+			this->img.push_back(imgRow);
+		}
+	}
+	this->width = _img.imageSize().first;
+	this->height = _img.imageSize().second;
+	return;
+}
+
+Image Image::convolution(const Image& _img, const bool& _padding = true) const
+{
+	Image result;
+	if (_padding)
+	{
+		result = Image(this->imageSize());
+		int paddingLength = (_img.imageSize().first-1)/2;
+		//Image paddedImage = Image()
+	}
+	else
+	{
+		
+	}
+	return result;
+}
+
+const deque<deque<float>>& Image::image() const
+{
+	return this->img;
+}
+
+inline pair<size_t, size_t> Image::imageSize() const
+{
+	return pair<size_t, size_t>(this->width, this->height);
 }
 
 bool Image::openImage(const string& _filename)
@@ -84,8 +169,8 @@ bool Image::openImage(const string& _filename)
 	ppmReadLine(imageFile, strbuf);
 	{
 		stream<<strbuf;
-		stream>>this->height>>this->width;
-		cout<<"\t图片大小为:"<<this->height<<"×"<<this->width<<endl;
+		stream>>this->width>>this->height;
+		cout<<"\t图片大小为:"<<this->width<<"×"<<this->height<<endl;
 	}
 	ppmReadLine(imageFile, strbuf);
 	{
@@ -93,7 +178,6 @@ bool Image::openImage(const string& _filename)
 	}
 	if (imgType == binary)
 	{
-		unsigned char pix;
 		for (size_t pixHeight=0; pixHeight!=this->height; pixHeight++)
 		{
 			deque<float> imgRow(this->width, 0);
@@ -129,6 +213,7 @@ unsigned char Image::ppmReadPixel(fstream& _fs)
 
 void Image::init()
 {
+	this->img.clear();
 	this->height = 0;
 	this->width = 0;
 	this->colorDepth = 0;
@@ -139,5 +224,6 @@ int main(int argc, char* argv[])
 {
 	Image luoxiaohei("image/luoxiaohei_small_gray.ppm");
 	Image luoxiaohei_c("image/luoxiaohei_small_xs_gray.ppm");
+	Image cres = luoxiaohei.convolution(luoxiaohei_c);
 	return 0;
 }
