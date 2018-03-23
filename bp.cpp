@@ -23,6 +23,8 @@ class Image
 		Image convolution(const Image&, const bool&) const;
 		const deque<deque<float>>& image() const;
 		pair<size_t, size_t> imageSize() const;
+		bool paste(const Image&, const size_t&, const size_t&);
+		bool save(const string&);
 	protected:
 		enum imageType
 		{
@@ -87,7 +89,7 @@ Image::Image(const pair<size_t, size_t>& _imgSize):
 }
 
 Image::Image(const pair<size_t, size_t>& _imgSize, const size_t& _padding):
-	Image(_imgSize.first + _padding, _imgSize.second + _padding)
+	Image(_imgSize.first + _padding*2, _imgSize.second + _padding*2)
 {
 	return;
 }
@@ -119,14 +121,39 @@ Image::Image(const Image& _img, const bool& _dontCopyContent)
 	return;
 }
 
-Image Image::convolution(const Image& _img, const bool& _padding = true) const
+Image Image::convolution(const Image& _kernel, const bool& _padding = true) const
 {
 	Image result;
 	if (_padding)
 	{
 		result = Image(this->imageSize());
-		int paddingLength = (_img.imageSize().first-1)/2;
-		//Image paddedImage = Image()
+		int paddingLength = (_kernel.imageSize().first-1)/2;
+		Image paddedImage(this->imageSize(), paddingLength);
+		paddedImage.paste(*this, paddingLength, paddingLength);
+		for (size_t row=0; row!=result.imageSize().second; row++)
+		{
+			cerr<<"\r"<<row<<"/"<<result.imageSize().second;
+			for (size_t col=0; col!=result.imageSize().first; col++)
+			{
+				float res = 0;
+				for (size_t kernelRow = 0;
+					kernelRow != _kernel.imageSize().second;
+					kernelRow++)
+				{
+					for (size_t kernelCol = 0;
+						kernelCol != _kernel.imageSize().first;
+						kernelCol++)
+					{
+						res +=
+							(paddedImage.image()[row+kernelRow][col+kernelCol]*
+							_kernel.image()[kernelRow][kernelCol]);
+					}
+				}
+				res /= _kernel.imageSize().first*_kernel.imageSize().second;
+				result.img[row][col] = res;
+			}
+		}
+		cerr<<endl;
 	}
 	else
 	{
@@ -135,7 +162,7 @@ Image Image::convolution(const Image& _img, const bool& _padding = true) const
 	return result;
 }
 
-const deque<deque<float>>& Image::image() const
+inline const deque<deque<float>>& Image::image() const
 {
 	return this->img;
 }
@@ -143,6 +170,39 @@ const deque<deque<float>>& Image::image() const
 inline pair<size_t, size_t> Image::imageSize() const
 {
 	return pair<size_t, size_t>(this->width, this->height);
+}
+
+bool Image::paste(const Image& _sourceImg, const size_t& _widthLocation,
+	const size_t& _heightLocation)
+{
+	for (size_t height = 0;
+		height != _sourceImg.imageSize().second;
+		height++)
+	{
+		for (size_t width = 0;
+			width != _sourceImg.imageSize().first;
+			width++)
+		{
+			this->img[height + _heightLocation][width + _widthLocation] =
+				_sourceImg.img[height][width];
+		}
+	}
+	return true;
+}
+
+bool Image::save(const string& _filename)
+{
+	fstream imageFile(_filename, ios::out);
+	imageFile<<"P6\n# Created By dgideas@outlook.com\n";
+	imageFile<<this->width<<" "<<this->height<<"\n255\n";
+	for (auto& imgRow: this->img)
+	{
+		for (auto& pix: imgRow)
+		{
+			unsigned char p = pix;
+			imageFile<<p<<p<<p;
+		}
+	}
 }
 
 bool Image::openImage(const string& _filename)
@@ -207,7 +267,9 @@ bool Image::ppmReadLine(fstream& _fs, string& _strbuf)
 unsigned char Image::ppmReadPixel(fstream& _fs)
 {
 	unsigned char pix;
-	_fs>>pix>>pix>>pix;
+	pix = _fs.get();
+	pix = _fs.get();
+	pix = _fs.get();
 	return pix;
 }
 
@@ -225,5 +287,6 @@ int main(int argc, char* argv[])
 	Image luoxiaohei("image/luoxiaohei_small_gray.ppm");
 	Image luoxiaohei_c("image/luoxiaohei_small_xs_gray.ppm");
 	Image cres = luoxiaohei.convolution(luoxiaohei_c);
+	cres.save("image/output.ppm");
 	return 0;
 }
