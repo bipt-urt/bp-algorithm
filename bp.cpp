@@ -150,6 +150,7 @@ Image Image::convolution(const Image& _kernel, const bool& _padding = true) cons
 					}
 				}
 				res /= _kernel.imageSize().first*_kernel.imageSize().second;
+				res /= 255;
 				result.img[row][col] = res;
 			}
 		}
