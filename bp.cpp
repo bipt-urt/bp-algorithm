@@ -1,3 +1,4 @@
+// dgideas@outlook.com
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -6,6 +7,8 @@
 #include <utility>
 #include <string>
 #include <cstdlib>
+#include <random>
+#include <algorithm>
 
 using namespace std;
 
@@ -20,11 +23,16 @@ class Image
 		Image(const pair<size_t, size_t>&, const size_t&);
 		Image(const Image&);
 		Image(const Image&, const bool&);
+		Image(const Image&, const char*);
+		Image(const Image&, const string&);
 		Image convolution(const Image&, const bool&) const;
 		const deque<deque<float>>& image() const;
 		pair<size_t, size_t> imageSize() const;
+		Image operator-(const Image&);
 		bool paste(const Image&, const size_t&, const size_t&);
 		bool save(const string&);
+		void adjustValue(float, float);
+		void adjustValue(float, float, float, float);
 	protected:
 		enum imageType
 		{
@@ -121,7 +129,46 @@ Image::Image(const Image& _img, const bool& _dontCopyContent)
 	return;
 }
 
-Image Image::convolution(const Image& _kernel, const bool& _padding = true) const
+Image::Image(const Image& _img, const char* _str):
+	Image(_img, std::string(_str))
+{
+	return;
+}
+
+Image::Image(const Image& _img, const string& _constructType)
+{
+	init();
+	if (_constructType == "random")
+	{
+		random_device rd;
+		mt19937 mt(rd());
+		uniform_int_distribution<> dist(0, 255);
+		for (size_t row = 0;
+			row != _img.imageSize().second;
+			row++)
+		{
+			deque<float> imgRow;
+			for (size_t col = 0;
+				col != _img.imageSize().first;
+				col++)
+			{
+				imgRow.push_back(dist(mt));
+			}
+			this->img.push_back(imgRow);
+		}
+		this->width = _img.imageSize().first;
+		this->height = _img.imageSize().second;
+		return;
+	}
+	else
+	{
+		cerr<<"Image(): 未识别的构造类型, 退出"<<endl;
+		exit(-1);
+	}
+}
+
+Image Image::convolution(const Image& _kernel, const bool& _padding = true)
+	const
 {
 	Image result;
 	if (_padding)
@@ -132,7 +179,7 @@ Image Image::convolution(const Image& _kernel, const bool& _padding = true) cons
 		paddedImage.paste(*this, paddingLength, paddingLength);
 		for (size_t row=0; row!=result.imageSize().second; row++)
 		{
-			cerr<<"\r"<<row<<"/"<<result.imageSize().second;
+			cerr<<"\r"<<row+1<<"/"<<result.imageSize().second;
 			for (size_t col=0; col!=result.imageSize().first; col++)
 			{
 				float res = 0;
@@ -173,6 +220,33 @@ inline pair<size_t, size_t> Image::imageSize() const
 	return pair<size_t, size_t>(this->width, this->height);
 }
 
+Image Image::operator-(const Image& _rhs)
+{
+	if (this->imageSize().first == _rhs.imageSize().first &&
+		this->imageSize().second == _rhs.imageSize().second)
+	{
+		Image result = Image(*this, true);
+		for (size_t row = 0;
+			row != this->imageSize().second;
+			row++)
+		{
+			for (size_t col = 0;
+				col != this->imageSize().first;
+				col++)
+			{
+				result.img[row][col] = this->image()[row][col] -
+					_rhs.image()[row][col];
+			}
+		}
+		return result;
+	}
+	else
+	{
+		cerr<<"在进行图片值差异操作时发现图片大小不符, 操作结束"<<endl;
+		exit(-1);
+	}
+}
+
 bool Image::paste(const Image& _sourceImg, const size_t& _widthLocation,
 	const size_t& _heightLocation)
 {
@@ -204,6 +278,71 @@ bool Image::save(const string& _filename)
 			imageFile<<p<<p<<p;
 		}
 	}
+}
+
+void Image::adjustValue(float _minValue, float _maxValue)
+{
+	if (_maxValue < _minValue)
+	{
+		float tmp = _minValue;
+		_minValue = _maxValue;
+		_maxValue = tmp;
+	}
+	vector<float> valueList;
+	for (size_t row = 0;
+		row != this->imageSize().second;
+		row++)
+	{
+		auto minMaxValue =
+			minmax_element(this->image()[row].begin(),
+				this->image()[row].end());
+		valueList.push_back(*(minMaxValue.first));
+		valueList.push_back(*(minMaxValue.second));
+	}
+	auto minMaxValue = minmax_element(valueList.begin(), valueList.end());
+	float imgMinValue = *(minMaxValue.first);
+	float imgMaxValue = *(minMaxValue.second);
+	this->adjustValue(_minValue, _maxValue, imgMinValue, imgMaxValue);
+	return;
+}
+
+void Image::adjustValue(float _minValueTo, float _maxValueTo,
+	float _minValueFrom, float _maxValueFrom)
+{
+	if (_maxValueTo < _minValueTo)
+	{
+		float tmp = _minValueTo;
+		_minValueTo = _maxValueTo;
+		_maxValueTo = tmp;
+	}
+	if (_maxValueFrom < _minValueFrom)
+	{
+		float tmp = _minValueFrom;
+		_minValueFrom = _maxValueFrom;
+		_maxValueFrom = tmp;
+	}
+	float adjustTimes = (_maxValueTo - _minValueTo) /
+		(_maxValueFrom - _minValueFrom);
+	for (size_t row = 0;
+		row != this->imageSize().second;
+		row++)
+	{
+		for (size_t col = 0;
+			col != this->imageSize().first;
+			col++)
+		{
+			this->img[row][col] *= adjustTimes;
+			if (this->img[row][col] < _minValueTo)
+			{
+				this->img[row][col] = _minValueTo;
+			}
+			if (this->img[row][col] > _maxValueTo)
+			{
+				this->img[row][col] = _maxValueTo;
+			}
+		}
+	}
+	return;
 }
 
 bool Image::openImage(const string& _filename)
@@ -286,8 +425,19 @@ void Image::init()
 int main(int argc, char* argv[])
 {
 	Image luoxiaohei("image/luoxiaohei_small_gray.ppm");
+	luoxiaohei.adjustValue(0, 1);
 	Image luoxiaohei_c("image/luoxiaohei_small_xs_gray.ppm");
-	Image cres = luoxiaohei.convolution(luoxiaohei_c);
-	cres.save("image/output.ppm");
+	luoxiaohei_c.adjustValue(0, 1);
+	Image randomKernel(luoxiaohei_c, "random");
+	randomKernel.adjustValue(0, 1);
+	Image featureMap = luoxiaohei.convolution(luoxiaohei_c);
+	featureMap.adjustValue(0, 255);
+	featureMap.save("image/feature.ppm");
+	Image randomFeature = luoxiaohei.convolution(randomKernel);
+	randomFeature.adjustValue(0, 255);
+	randomFeature.save("image/random.ppm");
+	//Image cres = luoxiaohei.convolution(luoxiaohei_c);
+	//cres.adjustValue(0, 255);
+	//cres.save("image/output.ppm");
 	return 0;
 }
