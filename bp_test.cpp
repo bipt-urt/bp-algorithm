@@ -180,7 +180,7 @@ Image Image::convolution(const Image& _kernel, const bool& _padding = true)
 		paddedImage.paste(*this, paddingLength, paddingLength);
 		for (size_t row=0; row!=result.imageSize().second; row++)
 		{
-			cerr<<"\r"<<row+1<<"/"<<result.imageSize().second;
+			//cerr<<"\r"<<row+1<<"/"<<result.imageSize().second;
 			for (size_t col=0; col!=result.imageSize().first; col++)
 			{
 				float res = 0;
@@ -202,7 +202,7 @@ Image Image::convolution(const Image& _kernel, const bool& _padding = true)
 				result.img[row][col] = res;
 			}
 		}
-		cerr<<endl;
+		//cerr<<endl;
 	}
 	else
 	{
@@ -369,6 +369,8 @@ void Image::trainingKernel(const Image& _rawImage, const Image& _diffMap,
 		cerr<<"无差异"<<endl;
 		return;
 	}
+	cerr<<"最大差异: "<<diffPosition.first<<", 使用的学习率为:"<<
+		_learningRate<<"("<<diffPosition.second.second<<","<<diffPosition.second.first<<")"<<endl;
 	int paddingLength = (this->imageSize().first-1)/2;
 	Image paddedImage(_rawImage.imageSize(), paddingLength);
 	paddedImage.paste(_rawImage, paddingLength, paddingLength);
@@ -471,24 +473,24 @@ void Image::init()
 
 int main(int argc, char* argv[])
 {
-	Image luoxiaohei("image/luoxiaohei_small_gray.ppm");
+	Image luoxiaohei("image2/image.ppm");
 	luoxiaohei.adjustValue(0, 1);
-	Image luoxiaohei_c("image/luoxiaohei_small_xs_gray.ppm");
+	Image luoxiaohei_c("image2/kernel.ppm");
 	luoxiaohei_c.adjustValue(0, 1);
 	Image randomKernel(luoxiaohei_c, "random");
-	randomKernel.save("image/randomKernel.ppm");
+	randomKernel.save("image2/randomKernel.ppm");
 	randomKernel.adjustValue(0, 1);
 	Image featureMap = luoxiaohei.convolution(luoxiaohei_c);
-	float dynamicLearningRate = 0.05f;
-	for (int i=0; i<10; i++)
+	float dynamicLearningRate = 0.01f;
+	for (int i=0; i<1000; i++)
 	{
 		Image randomFeature = luoxiaohei.convolution(randomKernel);
 		Image diff = featureMap - randomFeature;
-		dynamicLearningRate *= 0.9;
+		//dynamicLearningRate *= 0.9;
 		randomKernel.trainingKernel(luoxiaohei, diff, dynamicLearningRate);
 	}
 	randomKernel.adjustValue(0, 255);
-	randomKernel.save("image/trainedKernel.ppm");
+	randomKernel.save("image2/trainedKernel.ppm");
 	//Image cres = luoxiaohei.convolution(luoxiaohei_c);
 	//cres.adjustValue(0, 255);
 	//cres.save("image/output.ppm");
