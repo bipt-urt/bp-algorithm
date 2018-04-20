@@ -34,6 +34,8 @@ class Image
 		void adjustValue(float, float);
 		void adjustValue(float, float, float, float);
 		void trainingKernel(const Image&, const Image&, const float&);
+		void dump() const;
+		void dump(const string&) const;
 	protected:
 		enum imageType
 		{
@@ -50,6 +52,7 @@ class Image
 		size_t height;
 		size_t width;
 		int colorDepth;
+		string imageName;
 };
 
 Image::Image()
@@ -68,6 +71,7 @@ Image::Image(const string& _filename)
 	}
 	else
 	{
+		this->imageName = _filename;
 		cout<<"\t图片读取成功"<<endl;
 	}
 }
@@ -159,6 +163,7 @@ Image::Image(const Image& _img, const string& _constructType)
 		}
 		this->width = _img.imageSize().first;
 		this->height = _img.imageSize().second;
+		this->imageName = "随机生成图片";
 		return;
 	}
 	else
@@ -392,6 +397,75 @@ void Image::trainingKernel(const Image& _rawImage, const Image& _diffMap,
 	return;
 }
 
+void Image::dump() const
+{
+	this->dump("normal");
+	return;
+}
+
+void Image::dump(const string& _dumpMode) const
+{
+	if (_dumpMode == "csv")
+	{
+		for (size_t row = 0;
+			row != this->imageSize().second;
+			row++)
+		{
+			for (size_t col = 0;
+				col != this->imageSize().first;
+				col++)
+			{
+				cout<<this->image()[row][col];
+				if (col != this->imageSize().first-1)
+				{
+					cout<<",";
+				}
+			}
+			cout<<endl;
+		}
+		return;
+	}
+	cout<<"图片: "<<this->imageName<<endl;
+	cout<<"尺寸: "<<this->imageSize().second<<"*"
+		<<this->imageSize().first<<endl;
+	cout<<"[";
+	for (size_t row = 0;
+		row != this->imageSize().second;
+		row++)
+	{
+		cout<<"\t[";
+		if (this->imageSize().first > 6 && _dumpMode != "all")
+		{
+			const deque<float>& col = this->image()[row];
+			const size_t colSize = this->imageSize().first;
+			cout<<col[0]<<"\t"<<col[1]<<"\t"<<col[2]<<"\t...\t"<<
+				col[colSize-3]<<"\t"<<col[colSize-2]<<"\t"<<col[colSize-1]<<
+				"]("<<colSize<<")"<<endl;
+		}
+		else
+		{
+			for (size_t col = 0;
+				col != this->imageSize().first;
+				col++)
+			{
+				cout<<this->image()[row][col];
+				if (col != this->imageSize().first-1)
+				{
+					cout<<"\t";
+				}
+			}
+			cout<<"]"<<endl;
+			if (this->imageSize().second > 8)
+			{
+				cout<<endl;
+			}
+		}
+	}
+	cout<<"]("<<this->imageSize().second<<")";
+	cout<<endl;
+	return;
+}
+
 bool Image::openImage(const string& _filename)
 {
 	fstream imageFile(_filename, ios::in);
@@ -466,6 +540,7 @@ void Image::init()
 	this->height = 0;
 	this->width = 0;
 	this->colorDepth = 0;
+	this->imageName = "";
 	return;
 }
 
@@ -476,19 +551,20 @@ int main(int argc, char* argv[])
 	Image luoxiaohei_c("image/luoxiaohei_small_xs_gray.ppm");
 	luoxiaohei_c.adjustValue(0, 1);
 	Image randomKernel(luoxiaohei_c, "random");
-	randomKernel.save("image/randomKernel.ppm");
-	randomKernel.adjustValue(0, 1);
-	Image featureMap = luoxiaohei.convolution(luoxiaohei_c);
-	float dynamicLearningRate = 0.05f;
-	for (int i=0; i<10; i++)
-	{
-		Image randomFeature = luoxiaohei.convolution(randomKernel);
-		Image diff = featureMap - randomFeature;
-		dynamicLearningRate *= 0.9;
-		randomKernel.trainingKernel(luoxiaohei, diff, dynamicLearningRate);
-	}
-	randomKernel.adjustValue(0, 255);
-	randomKernel.save("image/trainedKernel.ppm");
+	randomKernel.dump("all");
+	//randomKernel.save("image/randomKernel.ppm");
+	//randomKernel.adjustValue(0, 1);
+	//Image featureMap = luoxiaohei.convolution(luoxiaohei_c);
+	//float dynamicLearningRate = 0.05f;
+	//for (int i=0; i<10; i++)
+	//{
+	//	Image randomFeature = luoxiaohei.convolution(randomKernel);
+	//	Image diff = featureMap - randomFeature;
+	//	dynamicLearningRate *= 0.9;
+	//	randomKernel.trainingKernel(luoxiaohei, diff, dynamicLearningRate);
+	//}
+	//randomKernel.adjustValue(0, 255);
+	//randomKernel.save("image/trainedKernel.ppm");
 	//Image cres = luoxiaohei.convolution(luoxiaohei_c);
 	//cres.adjustValue(0, 255);
 	//cres.save("image/output.ppm");
