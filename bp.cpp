@@ -15,6 +15,7 @@ using namespace std;
 class Image
 {
 	public:
+		using contentType = float;
 		Image();
 		Image(const string&);
 		Image(const size_t&);
@@ -31,11 +32,18 @@ class Image
 		Image operator-(const Image&);
 		bool paste(const Image&, const size_t&, const size_t&);
 		bool save(const string&);
-		void adjustValue(float, float);
-		void adjustValue(float, float, float, float);
-		void trainingKernel(const Image&, const Image&, const float&);
+		void minMaxNormalization(const contentType&, const contentType&);
+		void minMaxNormalization(contentType, contentType,
+			contentType, contentType);
+		contentType trainingKernel(
+			const Image&, const Image&, const contentType&);
 		void dump() const;
 		void dump(const string&) const;
+		void changeImageName(const string&);
+	public:
+		// deprecated, and will be removed in a future version
+		void adjustValue(float, float);
+		void adjustValue(float, float, float, float);
 	protected:
 		enum imageType
 		{
@@ -53,6 +61,7 @@ class Image
 		size_t width;
 		int colorDepth;
 		string imageName;
+		bool isDebug;
 };
 
 Image::Image()
@@ -131,6 +140,7 @@ Image::Image(const Image& _img, const bool& _dontCopyContent)
 	}
 	this->width = _img.imageSize().first;
 	this->height = _img.imageSize().second;
+	this->imageName = _img.imageName;
 	return;
 }
 
@@ -145,8 +155,21 @@ Image::Image(const Image& _img, const string& _constructType)
 	init();
 	if (_constructType == "random")
 	{
-		random_device rd;
-		mt19937 mt(rd());
+		unsigned int randomSeed;
+		if (this->isDebug)
+		{
+			// randomSeed = 24683;
+			// randomSeed = 1368975462;
+			randomSeed = 4121548759;
+		}
+		else
+		{
+			random_device rd;
+			randomSeed = rd();
+		}
+		cout<<"rd:"<<randomSeed<<endl;
+		randomSeed = 4121548759;
+		mt19937 mt(randomSeed);
 		uniform_int_distribution<> dist(0, 255);
 		for (size_t row = 0;
 			row != _img.imageSize().second;
@@ -185,7 +208,10 @@ Image Image::convolution(const Image& _kernel, const bool& _padding = true)
 		paddedImage.paste(*this, paddingLength, paddingLength);
 		for (size_t row=0; row!=result.imageSize().second; row++)
 		{
-			cerr<<"\r"<<row+1<<"/"<<result.imageSize().second;
+			if (this->isDebug)
+			{
+				cerr<<"\r图像卷积:"<<row+1<<"/"<<result.imageSize().second;
+			}
 			for (size_t col=0; col!=result.imageSize().first; col++)
 			{
 				float res = 0;
@@ -207,12 +233,16 @@ Image Image::convolution(const Image& _kernel, const bool& _padding = true)
 				result.img[row][col] = res;
 			}
 		}
-		cerr<<endl;
+		if (this->isDebug)
+		{
+			cerr<<endl;
+		}
 	}
 	else
 	{
 		
 	}
+	result.changeImageName("卷积后的图像");
 	return result;
 }
 
@@ -244,6 +274,7 @@ Image Image::operator-(const Image& _rhs)
 					_rhs.image()[row][col];
 			}
 		}
+		result.changeImageName("差异图");
 		return result;
 	}
 	else
@@ -286,6 +317,7 @@ bool Image::save(const string& _filename)
 	}
 }
 
+// deprecated
 void Image::adjustValue(float _minValue, float _maxValue)
 {
 	if (_maxValue < _minValue)
@@ -312,6 +344,7 @@ void Image::adjustValue(float _minValue, float _maxValue)
 	return;
 }
 
+// deprecated
 void Image::adjustValue(float _minValueTo, float _maxValueTo,
 	float _minValueFrom, float _maxValueFrom)
 {
@@ -351,8 +384,63 @@ void Image::adjustValue(float _minValueTo, float _maxValueTo,
 	return;
 }
 
-void Image::trainingKernel(const Image& _rawImage, const Image& _diffMap,
-	const float& _learningRate = 0.0001f)
+void Image::minMaxNormalization(const contentType& _minValue = 0.0,
+	const contentType& _maxValue = 1.0)
+{
+	vector<contentType> valueList;
+	for (const auto& row: this->image())
+	{
+		auto ans = minmax_element(row.begin(), row.end());
+		valueList.push_back(*ans.first);
+		valueList.push_back(*ans.second);
+	}
+	auto ans = minmax_element(valueList.begin(), valueList.end());
+	this->minMaxNormalization(_minValue, _maxValue,
+		*ans.first, *ans.second);
+	return;
+}
+
+void Image::minMaxNormalization(contentType _minValueTo,
+	contentType _maxValueTo,
+	contentType _minValueFrom,
+	contentType _maxValueFrom)
+{
+	if (_maxValueTo < _minValueTo)
+	{
+		contentType tmp = _minValueTo;
+		_minValueTo = _maxValueTo;
+		_maxValueTo = tmp;
+	}
+	if (_maxValueFrom < _minValueFrom)
+	{
+		contentType tmp = _minValueFrom;
+		_minValueFrom = _maxValueFrom;
+		_maxValueFrom = tmp;
+	}
+	contentType normTimes = (_maxValueTo - _minValueTo)/
+		(_maxValueFrom - _minValueFrom);
+	for (auto& row: this->img)
+	{
+		for_each(row.begin(), row.end(), [&](contentType& _ele)
+		{
+			_ele -= _minValueFrom;
+			_ele *= normTimes;
+			_ele += _minValueTo;
+			if (_ele < _minValueTo)
+			{
+				_ele = _minValueTo;
+			}
+			else if(_ele > _maxValueTo)
+			{
+				_ele = _maxValueTo;
+			}
+		});
+	}
+	return;
+}
+
+Image::contentType Image::trainingKernel(const Image& _rawImage,
+	const Image& _diffMap, const contentType& _learningRate = 0.0001)
 {
 	pair<float, pair<size_t, size_t>> diffPosition = {0, {-1, -1}};
 	for (size_t row = 0;
@@ -371,8 +459,18 @@ void Image::trainingKernel(const Image& _rawImage, const Image& _diffMap,
 	}
 	if (diffPosition.first == 0)
 	{
-		cerr<<"无差异"<<endl;
-		return;
+		if (this->isDebug)
+		{
+			cerr<<"无差异"<<endl;
+		}
+		return diffPosition.first;
+	}
+	if (this->isDebug)
+	{
+		cout<<"找到差异: "<<diffPosition.first<<". 位置为("<<
+			diffPosition.second.second+1<<","<<diffPosition.second.first+1<<
+			"): 内部坐标("<<diffPosition.second.first<<","<<
+			diffPosition.second.second<<");"<<endl;
 	}
 	int paddingLength = (this->imageSize().first-1)/2;
 	Image paddedImage(_rawImage.imageSize(), paddingLength);
@@ -394,7 +492,7 @@ void Image::trainingKernel(const Image& _rawImage, const Image& _diffMap,
 				];
 		}
 	}
-	return;
+	return abs(diffPosition.first);
 }
 
 void Image::dump() const
@@ -463,6 +561,12 @@ void Image::dump(const string& _dumpMode) const
 	}
 	cout<<"]("<<this->imageSize().second<<")";
 	cout<<endl;
+	return;
+}
+
+void Image::changeImageName(const string& _imageName)
+{
+	this->imageName = _imageName;
 	return;
 }
 
@@ -541,32 +645,46 @@ void Image::init()
 	this->width = 0;
 	this->colorDepth = 0;
 	this->imageName = "";
+	this->isDebug = false;
 	return;
 }
 
 int main(int argc, char* argv[])
 {
-	Image luoxiaohei("image/luoxiaohei_small_gray.ppm");
-	luoxiaohei.adjustValue(0, 1);
-	Image luoxiaohei_c("image/luoxiaohei_small_xs_gray.ppm");
-	luoxiaohei_c.adjustValue(0, 1);
-	Image randomKernel(luoxiaohei_c, "random");
+	Image img("dbg/image.ppm");
+	img.minMaxNormalization(0, 1, 0, 255);
+	Image kernel("dbg/kernel.ppm");
+	kernel.minMaxNormalization(0, 1, 0, 255);
+	Image randomKernel(kernel, "random");
+	randomKernel.minMaxNormalization(0, 1, 0, 255);
+	Image featureMap = img.convolution(kernel);
+	/*for (size_t times=0; times!=1000000; times++)
+	{
+		Image randomFeatureMap = img.convolution(randomKernel);
+		Image diff = featureMap - randomFeatureMap;
+		float delta = randomKernel.trainingKernel(img, diff, 0.0000001);
+		cout<<"\r"<<times+1<<":"<<delta;
+	}*/
+	float delta = 1.0f;
+	size_t times = 0;
+	float learningRate = 0.00001;
+	do
+	{
+		times++;
+		if (times == 100000)
+		{
+			cout<<endl;
+			learningRate *= 0.95;
+			times = 0;
+		}
+		Image randomFeatureMap = img.convolution(randomKernel);
+		Image diff = featureMap - randomFeatureMap;
+		delta = randomKernel.trainingKernel(img, diff, learningRate);
+		cout<<"\r"<<delta;
+	} while (delta > 0.0007f);
+	cout<<endl;
+	randomKernel.minMaxNormalization(0, 255);
 	randomKernel.dump("all");
-	//randomKernel.save("image/randomKernel.ppm");
-	//randomKernel.adjustValue(0, 1);
-	//Image featureMap = luoxiaohei.convolution(luoxiaohei_c);
-	//float dynamicLearningRate = 0.05f;
-	//for (int i=0; i<10; i++)
-	//{
-	//	Image randomFeature = luoxiaohei.convolution(randomKernel);
-	//	Image diff = featureMap - randomFeature;
-	//	dynamicLearningRate *= 0.9;
-	//	randomKernel.trainingKernel(luoxiaohei, diff, dynamicLearningRate);
-	//}
-	//randomKernel.adjustValue(0, 255);
-	//randomKernel.save("image/trainedKernel.ppm");
-	//Image cres = luoxiaohei.convolution(luoxiaohei_c);
-	//cres.adjustValue(0, 255);
-	//cres.save("image/output.ppm");
+	randomKernel.save("dbg/ans.ppm");
 	return 0;
 }
