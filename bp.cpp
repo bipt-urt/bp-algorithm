@@ -159,8 +159,7 @@ Image::Image(const Image& _img, const string& _constructType)
 		if (this->isDebug)
 		{
 			// randomSeed = 24683;
-			// randomSeed = 1368975462;
-			randomSeed = 4121548759;
+			randomSeed = 1368975462;
 		}
 		else
 		{
@@ -168,7 +167,6 @@ Image::Image(const Image& _img, const string& _constructType)
 			randomSeed = rd();
 		}
 		cout<<"rd:"<<randomSeed<<endl;
-		randomSeed = 4121548759;
 		mt19937 mt(randomSeed);
 		uniform_int_distribution<> dist(0, 255);
 		for (size_t row = 0;
@@ -304,7 +302,7 @@ bool Image::paste(const Image& _sourceImg, const size_t& _widthLocation,
 
 bool Image::save(const string& _filename)
 {
-	fstream imageFile(_filename, ios::out);
+	fstream imageFile(_filename, ios::out|ios::binary);
 	imageFile<<"P6\n# Created By dgideas@outlook.com\n";
 	imageFile<<this->width<<" "<<this->height<<"\n255\n";
 	for (auto& imgRow: this->img)
@@ -315,6 +313,7 @@ bool Image::save(const string& _filename)
 			imageFile<<p<<p<<p;
 		}
 	}
+	return true;
 }
 
 // deprecated
@@ -486,10 +485,10 @@ Image::contentType Image::trainingKernel(const Image& _rawImage,
 			this->img[kernelRow][kernelCol] += _learningRate *
 				(this->img[kernelRow][kernelCol]) *
 				paddedImage.image()[
-					diffPosition.second.second - paddingLength + kernelRow
+					diffPosition.second.second + kernelRow
 				][
-					diffPosition.second.first - paddingLength + kernelCol
-				];
+					diffPosition.second.first + kernelCol
+				]
 		}
 	}
 	return abs(diffPosition.first);
@@ -572,7 +571,7 @@ void Image::changeImageName(const string& _imageName)
 
 bool Image::openImage(const string& _filename)
 {
-	fstream imageFile(_filename, ios::in);
+	fstream imageFile(_filename, ios::in|ios::binary);
 	imageType imgType = unknown;
 	string strbuf;
 	stringstream stream;
@@ -658,31 +657,13 @@ int main(int argc, char* argv[])
 	Image randomKernel(kernel, "random");
 	randomKernel.minMaxNormalization(0, 1, 0, 255);
 	Image featureMap = img.convolution(kernel);
-	/*for (size_t times=0; times!=1000000; times++)
+	for (size_t times=0; times!=1; times++)
 	{
 		Image randomFeatureMap = img.convolution(randomKernel);
 		Image diff = featureMap - randomFeatureMap;
-		float delta = randomKernel.trainingKernel(img, diff, 0.0000001);
+		float delta = randomKernel.trainingKernel(img, diff, 0.00001);
 		cout<<"\r"<<times+1<<":"<<delta;
-	}*/
-	float delta = 1.0f;
-	size_t times = 0;
-	float learningRate = 0.00001;
-	do
-	{
-		times++;
-		if (times == 100000)
-		{
-			cout<<endl;
-			learningRate *= 0.95;
-			times = 0;
-		}
-		Image randomFeatureMap = img.convolution(randomKernel);
-		Image diff = featureMap - randomFeatureMap;
-		delta = randomKernel.trainingKernel(img, diff, learningRate);
-		cout<<"\r"<<delta;
-	} while (delta > 0.0007f);
-	cout<<endl;
+	}
 	randomKernel.minMaxNormalization(0, 255);
 	randomKernel.dump("all");
 	randomKernel.save("dbg/ans.ppm");
