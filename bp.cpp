@@ -40,10 +40,6 @@ class Image
 		void dump() const;
 		void dump(const string&) const;
 		void changeImageName(const string&);
-	public:
-		// deprecated, and will be removed in a future version
-		void adjustValue(float, float);
-		void adjustValue(float, float, float, float);
 	protected:
 		enum imageType
 		{
@@ -158,8 +154,8 @@ Image::Image(const Image& _img, const string& _constructType)
 		unsigned int randomSeed;
 		if (this->isDebug)
 		{
-			// randomSeed = 24683;
-			randomSeed = 1368975462;
+			randomSeed = 24683;
+			// randomSeed = 1368975462;
 		}
 		else
 		{
@@ -316,73 +312,6 @@ bool Image::save(const string& _filename)
 	return true;
 }
 
-// deprecated
-void Image::adjustValue(float _minValue, float _maxValue)
-{
-	if (_maxValue < _minValue)
-	{
-		float tmp = _minValue;
-		_minValue = _maxValue;
-		_maxValue = tmp;
-	}
-	vector<float> valueList;
-	for (size_t row = 0;
-		row != this->imageSize().second;
-		row++)
-	{
-		auto minMaxValue =
-			minmax_element(this->image()[row].begin(),
-				this->image()[row].end());
-		valueList.push_back(*(minMaxValue.first));
-		valueList.push_back(*(minMaxValue.second));
-	}
-	auto minMaxValue = minmax_element(valueList.begin(), valueList.end());
-	float imgMinValue = *(minMaxValue.first);
-	float imgMaxValue = *(minMaxValue.second);
-	this->adjustValue(_minValue, _maxValue, imgMinValue, imgMaxValue);
-	return;
-}
-
-// deprecated
-void Image::adjustValue(float _minValueTo, float _maxValueTo,
-	float _minValueFrom, float _maxValueFrom)
-{
-	if (_maxValueTo < _minValueTo)
-	{
-		float tmp = _minValueTo;
-		_minValueTo = _maxValueTo;
-		_maxValueTo = tmp;
-	}
-	if (_maxValueFrom < _minValueFrom)
-	{
-		float tmp = _minValueFrom;
-		_minValueFrom = _maxValueFrom;
-		_maxValueFrom = tmp;
-	}
-	float adjustTimes = (_maxValueTo - _minValueTo) /
-		(_maxValueFrom - _minValueFrom);
-	for (size_t row = 0;
-		row != this->imageSize().second;
-		row++)
-	{
-		for (size_t col = 0;
-			col != this->imageSize().first;
-			col++)
-		{
-			this->img[row][col] *= adjustTimes;
-			if (this->img[row][col] < _minValueTo)
-			{
-				this->img[row][col] = _minValueTo;
-			}
-			if (this->img[row][col] > _maxValueTo)
-			{
-				this->img[row][col] = _maxValueTo;
-			}
-		}
-	}
-	return;
-}
-
 void Image::minMaxNormalization(const contentType& _minValue = 0.0,
 	const contentType& _maxValue = 1.0)
 {
@@ -488,7 +417,7 @@ Image::contentType Image::trainingKernel(const Image& _rawImage,
 					diffPosition.second.second + kernelRow
 				][
 					diffPosition.second.first + kernelCol
-				]
+				];
 		}
 	}
 	return abs(diffPosition.first);
@@ -662,7 +591,7 @@ int main(int argc, char* argv[])
 		Image randomFeatureMap = img.convolution(randomKernel);
 		Image diff = featureMap - randomFeatureMap;
 		float delta = randomKernel.trainingKernel(img, diff, 0.00001);
-		cout<<"\r"<<times+1<<":"<<delta;
+		cout<<"\r"<<times+1<<":"<<delta<<endl;
 	}
 	randomKernel.minMaxNormalization(0, 255);
 	randomKernel.dump("all");
