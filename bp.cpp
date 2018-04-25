@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <random>
 #include <algorithm>
+#include <future>
 
 using namespace std;
 
@@ -412,11 +413,11 @@ Image::contentType Image::trainingKernel(const Image& _rawImage,
 			kernelCol++)
 		{
 			this->img[kernelRow][kernelCol] += _learningRate *
-				(this->img[kernelRow][kernelCol]) *
+				_diffMap.image()[diffPosition.second.first][diffPosition.second.second]*
 				paddedImage.image()[
-					diffPosition.second.second + kernelRow
+					diffPosition.second.first + kernelRow
 				][
-					diffPosition.second.first + kernelCol
+					diffPosition.second.second + kernelCol
 				];
 		}
 	}
@@ -584,17 +585,32 @@ int main(int argc, char* argv[])
 	Image kernel("dbg/kernel.ppm");
 	kernel.minMaxNormalization(0, 1, 0, 255);
 	Image randomKernel(kernel, "random");
+	randomKernel.save("dbg/randomKernel.ppm");
 	randomKernel.minMaxNormalization(0, 1, 0, 255);
 	Image featureMap = img.convolution(kernel);
-	for (size_t times=0; times!=1; times++)
+	float delta;
+	size_t times = 0;
+	float learningRate = 0.001;
+	do
 	{
 		Image randomFeatureMap = img.convolution(randomKernel);
 		Image diff = featureMap - randomFeatureMap;
-		float delta = randomKernel.trainingKernel(img, diff, 0.00001);
-		cout<<"\r"<<times+1<<":"<<delta<<endl;
-	}
-	randomKernel.minMaxNormalization(0, 255);
+		// diff.dump("all");
+		delta = randomKernel.trainingKernel(img, diff, learningRate);
+		cout<<"\r"<<delta;
+		if (times++ % 200000 == 0)
+		{
+			cout<<endl;
+			Image rkOutput = Image(randomKernel);
+			rkOutput.minMaxNormalization(0, 255);
+			rkOutput.save(string("dbg/0_")+to_string(times)+string(".ppm"));
+			// cout<<"请输入一个新学习率(上一次:"<<learningRate<<"):";
+			// cin>>learningRate;
+		}
+	} while (delta > 0.00001);
+	cout<<endl;
 	randomKernel.dump("all");
+	randomKernel.minMaxNormalization(0, 255);
 	randomKernel.save("dbg/ans.ppm");
 	return 0;
 }
