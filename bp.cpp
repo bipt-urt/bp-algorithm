@@ -28,7 +28,7 @@ class Image
 		Image(const Image&, const char*);
 		Image(const Image&, const string&);
 		Image convolution(const Image&, const bool&) const;
-		const deque<deque<float>>& image() const;
+		const deque<deque<contentType>>& image() const;
 		pair<size_t, size_t> imageSize() const;
 		Image operator-(const Image&);
 		bool paste(const Image&, const size_t&, const size_t&);
@@ -53,7 +53,7 @@ class Image
 		unsigned char ppmReadPixel(fstream&);
 	private:
 		void init();
-		deque<deque<float>> img;
+		deque<deque<contentType>> img;
 		size_t height;
 		size_t width;
 		int colorDepth;
@@ -93,7 +93,7 @@ Image::Image(const size_t& _width, const size_t& _height)
 	init();
 	for (size_t imgHeight=0; imgHeight!=_height; imgHeight++)
 	{
-		deque<float> imgRow(_width, 0);
+		deque<contentType> imgRow(_width, 0);
 		this->img.push_back(imgRow);
 	}
 	this->width = _width;
@@ -126,12 +126,12 @@ Image::Image(const Image& _img, const bool& _dontCopyContent)
 	{
 		if (_dontCopyContent)
 		{
-			deque<float> imgRow(_img.imageSize().first, 0);
+			deque<contentType> imgRow(_img.imageSize().first, 0);
 			this->img.push_back(imgRow);
 		}
 		else
 		{
-			deque<float> imgRow(_img.image()[imgHeight]);
+			deque<contentType> imgRow(_img.image()[imgHeight]);
 			this->img.push_back(imgRow);
 		}
 	}
@@ -170,7 +170,7 @@ Image::Image(const Image& _img, const string& _constructType)
 			row != _img.imageSize().second;
 			row++)
 		{
-			deque<float> imgRow;
+			deque<contentType> imgRow;
 			for (size_t col = 0;
 				col != _img.imageSize().first;
 				col++)
@@ -245,7 +245,7 @@ Image Image::convolution(const Image& _kernel,
 	return result;
 }
 
-inline const deque<deque<float>>& Image::image() const
+inline const deque<deque<Image::contentType>>& Image::image() const
 {
 	return this->img;
 }
@@ -375,7 +375,7 @@ void Image::minMaxNormalization(contentType _minValueTo,
 Image::contentType Image::trainingKernel(const Image& _rawImage,
 	const Image& _diffMap, const contentType& _learningRate = 0.0001)
 {
-	pair<float, pair<size_t, size_t>> diffPosition = {0, {-1, -1}};
+	pair<contentType, pair<size_t, size_t>> diffPosition = {0, {-1, -1}};
 	for (size_t row = 0;
 		row != _diffMap.imageSize().second;
 		row++)
@@ -468,7 +468,7 @@ void Image::dump(const string& _dumpMode) const
 		cout<<"\t[";
 		if (this->imageSize().first > 6 && _dumpMode != "all")
 		{
-			const deque<float>& col = this->image()[row];
+			const deque<contentType>& col = this->image()[row];
 			const size_t colSize = this->imageSize().first;
 			cout<<col[0]<<"\t"<<col[1]<<"\t"<<col[2]<<"\t...\t"<<
 				col[colSize-3]<<"\t"<<col[colSize-2]<<"\t"<<col[colSize-1]<<
@@ -539,7 +539,7 @@ bool Image::openImage(const string& _filename)
 	{
 		for (size_t pixHeight=0; pixHeight!=this->height; pixHeight++)
 		{
-			deque<float> imgRow(this->width, 0);
+			deque<contentType> imgRow(this->width, 0);
 			for (size_t pixWidth=0; pixWidth!=this->width; pixWidth++)
 			{
 				imgRow[pixWidth] = ppmReadPixel(imageFile);
@@ -582,6 +582,11 @@ void Image::init()
 	this->isDebug = false;
 	return;
 }
+
+class Layer
+{
+	
+};
 
 int main(int argc, char* argv[])
 {
