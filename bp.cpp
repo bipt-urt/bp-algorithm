@@ -41,9 +41,6 @@ class Image
 		void dump() const;
 		void dump(const string&) const;
 		void changeImageName(const string&);
-	public:
-		// parallel version
-		Image convolutionParallel(const Image&, const bool&) const;
 	protected:
 		enum imageType
 		{
@@ -194,57 +191,7 @@ Image::Image(const Image& _img, const string& _constructType)
 	}
 }
 
-Image Image::convolution(const Image& _kernel, const bool& _padding = true)
-	const
-{
-	Image result;
-	if (_padding)
-	{
-		result = Image(this->imageSize());
-		int paddingLength = (_kernel.imageSize().first-1)/2;
-		Image paddedImage(this->imageSize(), paddingLength);
-		paddedImage.paste(*this, paddingLength, paddingLength);
-		for (size_t row=0; row!=result.imageSize().second; row++)
-		{
-			if (this->isDebug)
-			{
-				cerr<<"\r图像卷积:"<<row+1<<"/"<<result.imageSize().second;
-			}
-			for (size_t col=0; col!=result.imageSize().first; col++)
-			{
-				float res = 0;
-				for (size_t kernelRow = 0;
-					kernelRow != _kernel.imageSize().second;
-					kernelRow++)
-				{
-					for (size_t kernelCol = 0;
-						kernelCol != _kernel.imageSize().first;
-						kernelCol++)
-					{
-						res +=
-							(paddedImage.image()[row+kernelRow][col+kernelCol]*
-							_kernel.image()[kernelRow][kernelCol]);
-					}
-				}
-				res /= _kernel.imageSize().first*_kernel.imageSize().second;
-				res /= 255;
-				result.img[row][col] = res;
-			}
-		}
-		if (this->isDebug)
-		{
-			cerr<<endl;
-		}
-	}
-	else
-	{
-		
-	}
-	result.changeImageName("卷积后的图像");
-	return result;
-}
-
-Image Image::convolutionParallel(const Image& _kernel,
+Image Image::convolution(const Image& _kernel,
 	const bool& _padding = true) const
 {
 	Image result;
@@ -258,7 +205,7 @@ Image Image::convolutionParallel(const Image& _kernel,
 		for (size_t row=0; row!=result.imageSize().second; row++)
 		{
 			cout<<"\r"<<row+1<<"/"<<result.imageSize().second;
-			taskList.push_back(async(launch::async, [row, &result, &_kernel, &paddedImage]{
+			taskList.push_back(async(launch::async, [&, row]{
 				deque<contentType> res;
 				for (size_t col=0; col!=result.imageSize().first; col++)
 				{
@@ -294,6 +241,7 @@ Image Image::convolutionParallel(const Image& _kernel,
 	{
 		
 	}
+	result.imageName = "卷积后的图像";
 	return result;
 }
 
@@ -469,7 +417,8 @@ Image::contentType Image::trainingKernel(const Image& _rawImage,
 			kernelCol++)
 		{
 			this->img[kernelRow][kernelCol] += _learningRate *
-				_diffMap.image()[diffPosition.second.first][diffPosition.second.second]*
+				_diffMap.image()[diffPosition.second.first]
+					[diffPosition.second.second]*
 				paddedImage.image()[
 					diffPosition.second.first + kernelRow
 				][
@@ -630,7 +579,7 @@ void Image::init()
 	this->width = 0;
 	this->colorDepth = 0;
 	this->imageName = "";
-	this->isDebug = true;
+	this->isDebug = false;
 	return;
 }
 
@@ -643,23 +592,24 @@ int main(int argc, char* argv[])
 	Image randomKernel(kernel, "random");
 	randomKernel.save("image/output/randomKernel.ppm");
 	randomKernel.minMaxNormalization(0, 1, 0, 255);
-	Image featureMap = img.convolutionParallel(kernel);
+	Image featureMap = img.convolution(kernel);
 	float delta;
 	size_t times = 0;
 	float learningRate = 0.001;
 	do
 	{
-		Image randomFeatureMap = img.convolutionParallel(randomKernel);
+		Image randomFeatureMap = img.convolution(randomKernel);
 		Image diff = featureMap - randomFeatureMap;
 		// diff.dump("all");
 		delta = randomKernel.trainingKernel(img, diff, learningRate);
 		cout<<"\r"<<delta;
-		if (times++ % 200000 == 0)
+		if (times++ % 100 == 0)
 		{
 			cout<<endl;
 			Image rkOutput = Image(randomKernel);
 			rkOutput.minMaxNormalization(0, 255);
-			rkOutput.save(string("image/output/")+to_string(times)+string(".ppm"));
+			rkOutput.save(string("image/output/")+
+				to_string(times)+string(".ppm"));
 			// cout<<"请输入一个新学习率(上一次:"<<learningRate<<"):";
 			// cin>>learningRate;
 		}
